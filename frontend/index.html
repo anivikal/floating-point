@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Detect, analyze, and visualize catastrophic cancellation, floating-point drift, and precision loss in mathematical operations.">
+    <title>FP Error Analyzer — Floating Point Precision Dashboard</title>
+
+    <!-- Google Fonts: Inter for UI, JetBrains Mono for code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Chart.js 4 via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- HEADER                                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <header id="app-header">
+        <div class="header-content">
+            <div class="header-title-group">
+                <div class="header-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>FP Error Analyzer</h1>
+                    <p class="header-subtitle">IEEE 754 Precision Loss Detector &amp; Visualizer</p>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                <span id="api-status">Connecting…</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="app-main">
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- MODE TABS                                                   -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <nav id="mode-tabs" role="tablist" aria-label="Analysis modes">
+            <button class="tab active" data-mode="catastrophic_cancellation" role="tab" aria-selected="true" id="tab-catastrophic">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                Catastrophic Cancellation
+            </button>
+            <button class="tab" data-mode="iterative_drift" role="tab" aria-selected="false" id="tab-drift">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Iterative Drift
+            </button>
+            <button class="tab" data-mode="summation_error" role="tab" aria-selected="false" id="tab-summation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                Summation Error
+            </button>
+        </nav>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- CONTROL PANEL                                               -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section id="control-panel" class="glass-panel">
+            <div class="panel-header">
+                <h2>Parameters</h2>
+                <button id="btn-analyze" class="btn-primary" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Analyze
+                </button>
+            </div>
+
+            <!-- Dynamic form rendered by JS -->
+            <div id="param-form"></div>
+
+            <!-- Example Buttons -->
+            <div id="examples-section">
+                <h3>Quick Demos</h3>
+                <div id="examples-grid"></div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- RESULTS PANEL                                               -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section id="results-panel">
+
+            <!-- Danger Score Gauge -->
+            <div id="danger-card" class="glass-panel">
+                <h2>Danger Score</h2>
+                <div id="gauge-container">
+                    <div id="gauge-ring">
+                        <div id="gauge-fill"></div>
+                        <div id="gauge-center">
+                            <span id="gauge-value">—</span>
+                            <span id="gauge-label">WAITING</span>
+                        </div>
+                    </div>
+                </div>
+                <p id="danger-summary" class="summary-text">Run an analysis to see the danger score.</p>
+            </div>
+
+            <!-- Divergence Chart -->
+            <div id="chart-divergence-card" class="glass-panel chart-card">
+                <h2>Value Divergence</h2>
+                <p class="chart-subtitle">Float (IEEE 754) vs Ground Truth (mpmath 50-digit)</p>
+                <div class="chart-wrapper">
+                    <canvas id="chart-divergence"></canvas>
+                </div>
+            </div>
+
+            <!-- Error Chart -->
+            <div id="chart-error-card" class="glass-panel chart-card">
+                <h2>Precision Loss</h2>
+                <p class="chart-subtitle">Bits of precision lost at each data point (max 52)</p>
+                <div class="chart-wrapper">
+                    <canvas id="chart-error"></canvas>
+                </div>
+            </div>
+
+            <!-- Annotations -->
+            <div id="annotations-card" class="glass-panel">
+                <h2>Annotations</h2>
+                <div id="annotations-list">
+                    <p class="placeholder-text">Annotations will appear here after analysis.</p>
+                </div>
+            </div>
+
+            <!-- Metadata -->
+            <div id="metadata-card" class="glass-panel">
+                <h2>Computation Metadata</h2>
+                <div id="metadata-content">
+                    <p class="placeholder-text">Metadata will appear here after analysis.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <p>Computing ground truth with 50-digit precision…</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
